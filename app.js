@@ -1,9 +1,11 @@
 //jshint esversion:6
-
+require('dotenv').config();
 const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+//we use mongoose-encryption to encrypt our password
+const encrypt = require("mongoose-encryption");
 
 const app = express();
 const port = 3000;
@@ -14,10 +16,19 @@ app.use(express.static("public"));
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
 
-const userSchema ={
+//we need proper schema for these methods
+const userSchema =new mongoose.Schema({
     email: String,
     password: String
-};
+});
+
+//our key
+// const secret = "Thisisourlittlesecret.";
+//the secret went in .env, if we are not using .env, we need to put our key here
+//we use our encrypt in our userSchema with our key
+//we are only encrypting password field
+userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
+//we are getting our key from .env file
 
 const User = new mongoose.model("User", userSchema);
 
@@ -47,6 +58,7 @@ app.post("/login", (req,res)=>{
 app.get("/login", (req, res) => {
     res.render("login");
 })
+app.get("/logout", (req, res)=> { res.redirect("/")});
 
 app.get("/", (req, res) => {
     res.render("home.ejs");
