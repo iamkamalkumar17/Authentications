@@ -4,8 +4,7 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-//we use mongoose-encryption to encrypt our password
-const encrypt = require("mongoose-encryption");
+const md5 = require("md5")
 
 const app = express();
 const port = 3000;
@@ -22,13 +21,7 @@ const userSchema =new mongoose.Schema({
     password: String
 });
 
-//our key
-// const secret = "Thisisourlittlesecret.";
-//the secret went in .env, if we are not using .env, we need to put our key here
-//we use our encrypt in our userSchema with our key
-//we are only encrypting password field
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
-//we are getting our key from .env file
+
 
 const User = new mongoose.model("User", userSchema);
 
@@ -39,13 +32,13 @@ app.get("/register", (req, res)=> {
 app.post("/register", (req, res) => {
     const newUser = new User({
         email: req.body.username,
-        password: req.body.password
+        password: md5(req.body.password)
     });
     newUser.save().catch((err) => {console.log(err)}).then(res.render("secrets"));
 });
 app.post("/login", (req,res)=>{
     const username = req.body.username;
-    const password = req.body.password;
+    const password = md5(req.body.password);
 
     User.findOne({email: username}).then((foundUser) => {
         if(foundUser.password === password) {
