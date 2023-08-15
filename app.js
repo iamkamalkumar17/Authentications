@@ -7,10 +7,16 @@ const mongoose = require("mongoose");
 const session = require('express-session');
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require("mongoose-findorcreate");
 //passport-local-mongoose automatically salt and hash our password for us
 
 //npm i passport passport-local passport-local-mongoose express-session
 //this saves our session in cookies, and we don't get logged out until we don;t logout
+
+//third party OAuth- open authentication
+//npm install passport-google-oauth20
+//create an application on google developres console
 
 
 const app = express();
@@ -35,10 +41,12 @@ mongoose.connect("mongodb://127.0.0.1:27017/userDB").then(console.log("mongodb c
 //we need proper schema for these methods
 const userSchema =new mongoose.Schema({
     email: String,
-    password: String
+    password: String,
+    googleId: String
 });
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 
 const User = new mongoose.model("User", userSchema);
@@ -46,8 +54,31 @@ const User = new mongoose.model("User", userSchema);
 passport.use(User.createStrategy());
 
 // use static serialize and deserialize of model for passport session support
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.serializeUser(function(user, cb) {
+    process.nextTick(function() {
+      return cb(null, user.id);
+    });
+  });
+  
+  passport.deserializeUser(function(id, cb) {
+    db.get('SELECT * FROM users WHERE id = ?', [ id ], function(err, user) {
+      if (err) { return cb(err); }
+      return cb(null, user);
+    });
+  });
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/",
+    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
 
 app.get("/register", (req, res)=> {
     res.render("register")
@@ -100,6 +131,17 @@ app.get("/", (req, res) => {
     res.render("home.ejs");
 })
 
+
+app.get("/auth/google", function(req, res){
+    passport.authenticate("google", {scope: ['profile']});
+})
+
+app.get('/auth/google/secrets', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect secrets.
+    res.redirect('/secrets');
+  });
 app.listen(port, ()=>{
     console.log("app runs at 3000");
 })
